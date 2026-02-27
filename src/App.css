@@ -1,0 +1,305 @@
+
+/*--------------HARING AMA--------------*/
+:root {
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+}
+
+/*--------Dark Mode--------*/
+.app-container.dark-mode {
+  --color-bg: #ffffff;
+  --color-text: black;
+  --color-border: #ddd;
+  --color-container-bg: #f5f5f5;
+  --color-button-bg: #000;
+  --color-button-text: white;
+}
+
+/*--------Light Mode--------*/
+.app-container.light-mode {
+  --color-bg: #1a1a1a;
+  --color-text: white;
+  --color-border: #444;
+  --color-container-bg: #2a2a2a;
+  --color-button-bg: #fff;
+  --color-button-text: black;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+}
+
+body {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+}
+
+/*----------------------POP UP NOTIFICATION--------------------*/
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.notification {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #ffffff;
+  text-align: center;
+  font-size: clamp(0.9rem, 2vw, 1.1rem);
+  font-weight: 600;
+  z-index: 1000;
+  animation: fadeIn 0.3s ease-in, fadeOut 0.3s ease-out 2.7s forwards;
+}
+
+/*---------------------LIGHT/DARK MODE SWITCH----------------------*/
+
+.theme-toggle {
+  position: fixed;
+  top: var(--spacing-md);
+  right: var(--spacing-md);
+  z-index: 100;
+}
+
+.theme-checkbox {
+  display: none;
+}
+
+.theme-slider {
+  display: block;
+  width: clamp(50px, 8vw, 65px);
+  height: clamp(26px, 4vw, 33px);
+  background-color: var(--color-button-bg);
+  border: 2px solid var(--color-border);
+  border-radius: 34px;
+  cursor: pointer;
+  position: relative;
+  transition: background-color 0.3s ease;
+}
+
+.theme-slider::before {
+  content: '';
+  position: absolute;
+  width: clamp(20px, 4vw, 25px);
+  height: clamp(20px, 4vw, 25px);
+  background-color: var(--color-text);
+  border-radius: 50%;
+  top: 50%;
+  left: 2px;
+  transform: translateY(-50%);
+  transition: left 0.3s ease, background-color 0.3s ease;
+}
+
+.theme-checkbox:checked + .theme-slider::before {
+  left: calc(100% - clamp(22px, 4vw, 27px));
+}
+
+/*-------------------------TITLE HEADER--------------------------*/
+
+.header {
+  padding: var(--spacing-md);
+  text-align: center;
+}
+
+.header h1 {
+
+  margin: 0;
+  font-size: clamp(1.3rem, 5vw, 2.5rem);
+  font-weight: 750;
+}
+
+
+/*--------------------CAMERA PREVIEW BOX------------------------*/
+
+.camera-section {
+  width: calc(100% - 2 * var(--spacing-md));
+  max-width: 600px;
+  margin: var(--spacing-md) auto 0;
+}
+
+.guide-text {
+  margin: 0 0 var(--spacing-md) 0;
+  color: var(--color-text);
+  opacity: 1;
+  font-size: clamp(0.85rem, 2vw, 0.95rem);
+  font-weight: 500;
+}
+
+.camera-preview {
+  width: 100%;
+  height: clamp(250px, 65vh, 500px);
+  background-color: #000;
+  overflow: hidden;
+  margin: 0 0 var(--spacing-lg) 0;
+  padding: 0;
+  border-radius: 0.5rem;
+}
+
+.camera-preview video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/*----------------CAPTURE AND REPLAY BUTTON----------------------*/
+
+
+.button-container {
+  display: flex;
+  gap: var(--spacing-md);
+  justify-content: center;
+  max-width: 600px;
+  width: calc(100% - 2 * var(--spacing-md));
+  margin: 0 auto var(--spacing-lg);
+}
+
+.capture-btn,
+.audio-btn {
+  flex: 1;
+  padding: clamp(0.75rem, 2vh, 1.5rem) clamp(1.5rem, 4vw, 2.5rem);
+  background-color: var(--color-button-bg);
+  color: var(--color-button-text);
+  border: none;
+  outline: none;
+  border-radius: 0.5rem;
+  font-size: clamp(1rem, 2vw, 1.25rem);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.6);
+}
+
+.capture-btn:hover,
+.audio-btn:hover,
+.clear-btn:hover {
+  background-color: var(--color-button-bg);
+  filter: brightness(0.85);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
+}
+
+.capture-btn:focus,
+.audio-btn:focus,
+.clear-btn:focus {
+  outline: none;
+}
+
+.capture-btn:active,
+.audio-btn:active,
+.clear-btn:active {
+  background-color: var(--color-button-bg);
+  filter: brightness(0.7);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+  transform: translateY(0);
+}
+
+.captions-container {
+  width: calc(100% - 2 * var(--spacing-md));
+  max-width: 600px;
+  min-height: 80px;
+  background-color: var(--color-container-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  padding: var(--spacing-md);
+  margin: 0 auto var(--spacing-lg);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.clear-btn {
+  display: block;
+  margin: 0 auto var(--spacing-lg);
+  padding: var(--spacing-md);
+  background-color: var(--color-button-bg);
+  width: calc(100% - 2 * var(--spacing-md));
+  max-width: 600px;
+  color: var(--color-button-text);
+  border: none;
+  outline: none;
+  border-radius: 0.5rem;
+  font-size: clamp(0.9rem, 2vw, 1.1rem);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.6);
+}
+.captions-text {
+  margin: 0;
+  color: var(--color-text);
+  font-size: clamp(0.9rem, 2vw, 1rem);
+  line-height: 1.6;
+  word-wrap: break-word;
+}
+
+
+
+/*---------------------------MOBILE RESPONSIVE STYLING------------------------*/
+
+
+
+
+/*---------Mobile----------*/
+.app-container {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/*---------Tablet---------*/
+@media (min-width: 768px) {
+  .header {
+    padding: var(--spacing-lg);
+  }
+  .camera-section {
+    max-width: 90%;
+  }
+  .camera-preview {
+    aspect-ratio: 16 / 9;
+    height: auto;
+  }
+  .button-container {
+    max-width: 90%;
+  }
+  .captions-container {
+    max-width: 90%;
+    min-height: 100px;
+  }
+}
+
+/*---------Desktop------------*/
+@media (min-width: 1024px) {
+  .header {
+    padding: var(--spacing-xl);
+  }
+  .camera-preview {
+    max-height: 500px;
+  }
+  .clear-btn {
+    max-width: 400px;
+  }
+}
