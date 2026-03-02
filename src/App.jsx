@@ -506,7 +506,7 @@ export default function App() {
       {mode === 'realtime' && (
         <div className="camera-section">
           <p className="guide-text">
-            Point the camera at a bill — detection runs automatically.
+            Point the camera at a bill and press "Capture & Verify."
           </p>
 
           <input type="range" className="volume-slider" />
