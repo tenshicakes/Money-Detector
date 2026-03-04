@@ -207,24 +207,26 @@ body {
 }
 
 
+
 .capture-btn img,
 .audio-btn img {
-  filter: invert(0); /* default: black */
+  filter: invert(1); /* default: black icon becomes white */
   transition: filter 0.3s;
 }
 
 
 
+
 .app-container.light-mode .capture-btn img,
 .app-container.light-mode .audio-btn img {
-  filter: invert(0); /* white icons in light mode */
+  filter: invert(0); /* show black icon in light mode */
 }
 
 
+
 .app-container.dark-mode .capture-btn img,
-.app-container.dark-mode .audio-btn img
- {
-  filter: invert(1); /* black icons in dark mode */
+.app-container.dark-mode .audio-btn img {
+  filter: invert(1); /* show white icon in dark mode */
 }
 
 

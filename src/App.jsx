@@ -608,6 +608,7 @@ export default function App() {
             onClick={detectOnImage}
             disabled={!uploadedImage || isDetecting}
           >
+            <img src={cameraIcon} alt="Camera" style={{width: '1.2em', verticalAlign: 'middle', marginRight: '0.4em'}} />
             {isDetecting ? 'Detecting…' : 'Detect Bill'}
           </button>
         )}
