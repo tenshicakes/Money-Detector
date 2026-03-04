@@ -215,13 +215,10 @@ body {
 
 
 
-
-
 .app-container.light-mode .capture-btn img,
 .app-container.light-mode .audio-btn img {
   filter: invert(0); /* white icons in light mode */
 }
-
 
 
 .app-container.dark-mode .capture-btn img,
