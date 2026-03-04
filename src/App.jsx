@@ -1,4 +1,6 @@
 import './App.css'
+import cameraIcon from './icons/camera.svg';
+import audioIcon from './icons/audio.svg';
 import { useEffect, useRef, useState, useCallback } from 'react'
 
 /* ──────────────────────────────────────────────
@@ -510,18 +512,22 @@ export default function App() {
           className={`mode-btn ${mode === 'realtime' ? 'mode-active' : ''}`}
           onClick={() => switchMode('realtime')}
         >
-          🎥 Real-time
+        Real-time
         </button>
+
         <button
           className={`mode-btn ${mode === 'image' ? 'mode-active' : ''}`}
           onClick={() => switchMode('image')}
         >
-          🖼️ Image Upload
+        Image Upload
         </button>
+
       </div>
 
       {/* Model loading indicator (non-blocking) */}
       {!modelReady && (
+        <p className="guide-text" style={{ textAlign: 'center' }}>
+          Loading detection model…
         <p className="guide-text" style={{ textAlign: 'center', fontSize: '0.85rem', opacity: 0.8 }}>
           ⏳ {modelStatus}
         </p>
@@ -589,6 +595,7 @@ export default function App() {
       <div className="button-container">
         {mode === 'realtime' && (
           <button className="capture-btn" onClick={captureImage}>
+            <img src={cameraIcon} alt="Camera" style={{width: '1.2em', verticalAlign: 'middle', marginRight: '0.4em'}} />
             Capture &amp; Verify
           </button>
         )}
@@ -607,6 +614,7 @@ export default function App() {
             window.speechSynthesis.speak(utter)
           }
         }}>
+          <img src={audioIcon} alt="Audio" style={{width: '1.2em', verticalAlign: 'middle', marginRight: '0.4em'}} />
           Replay Audio
         </button>
       </div>
