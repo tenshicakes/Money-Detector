@@ -526,11 +526,14 @@ export default function App() {
 
       {/* Model loading indicator (non-blocking) */}
       {!modelReady && (
-        <p className="guide-text" style={{ textAlign: 'center' }}>
-          Loading detection model…
-        <p className="guide-text" style={{ textAlign: 'center', fontSize: '0.85rem', opacity: 0.8 }}>
-          ⏳ {modelStatus}
-        </p>
+        <>
+          <p className="guide-text" style={{ textAlign: 'center' }}>
+            Loading detection model…
+          </p>
+          <p className="guide-text" style={{ textAlign: 'center', fontSize: '0.85rem', opacity: 0.8 }}>
+            ⏳ {modelStatus}
+          </p>
+        </>
       )}
 
       {/* ─── REALTIME MODE ─── */}
@@ -630,5 +633,6 @@ export default function App() {
       </div>
 
     </div>
-  )
+  );
 }
+
