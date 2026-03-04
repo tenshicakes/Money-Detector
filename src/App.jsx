@@ -2,18 +2,18 @@ import './App.css'
 import cameraIcon from './icons/camera.svg';
 import audioIcon from './icons/audio.svg';
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { InferenceEngine } from 'inferencejs'
 
 /* ──────────────────────────────────────────────
    Roboflow inferencejs — client-side only
-   The UMD bundle is loaded via <script> in index.html
-   and exposes window.InferenceEngine & window.CVImage.
+   Imported as an npm module (inferencejs).
    ────────────────────────────────────────────── */
 
 const RF_API_KEY   = 'rf_J8z0Ag3yFvdfvLiDpmtOPMVcNQs2'
 const RF_MODEL     = 'bill-detection-emid4'
-const RF_VERSION   = 2
-const VALID_CLASSES = ['20', '50', '100', '200', '500']
-const CONFIDENCE_THRESHOLD = 0.25
+const RF_VERSION   = 3
+const VALID_CLASSES = ['20', '50', '100', '200', '500', '1000']
+const CONFIDENCE_THRESHOLD = 0.50
 const TRIPLE_CHECK_COUNT = 3
 
 /* ── colour per denomination for bounding boxes ── */
@@ -23,6 +23,7 @@ const CLASS_COLORS = {
   '100': '#ffea00',
   '200': '#ff9100',
   '500': '#ff1744',
+  '1000': '#ff5252',
 }
 const DEFAULT_COLOR = '#00ff00'
 
@@ -116,35 +117,25 @@ export default function App() {
   }, [])
 
   /* ────────────────────────────────────────────
-     2. inferencejs engine init (client-side)
-     Uses the UMD global loaded in index.html:
-       window.InferenceEngine, window.CVImage
+     2. inferencejs engine init (npm module)
+     Imports InferenceEngine directly from 'inferencejs'.
      ──────────────────────────────────────────── */
   useEffect(() => {
     let cancelled = false
     const init = async () => {
       try {
-        // Resolve InferenceEngine constructor — UMD global OR npm import
-        let EngineCtor = null
-        if (typeof window !== 'undefined' && window.InferenceEngine) {
-          EngineCtor = window.InferenceEngine
-        } else {
-          try {
-            const mod = await import('inferencejs')
-            EngineCtor = mod.InferenceEngine || mod.default?.InferenceEngine || mod.default || mod
-          } catch { /* not available */ }
-        }
-
-        if (!EngineCtor) {
-          console.warn('InferenceEngine not available — will use Roboflow API fallback')
-          if (!cancelled) setModelReady(true) // allow fallback mode
-          return
-        }
-
-        const engine = new EngineCtor()
+        const engine = new InferenceEngine()
         engineRef.current = engine
 
-        const workerId = await engine.startWorker(RF_MODEL, RF_VERSION, RF_API_KEY)
+        console.info('[inferencejs] Starting worker…')
+
+        // startWorker can hang if the model isn't accessible — add a 30s timeout
+        const workerPromise = engine.startWorker(RF_MODEL, RF_VERSION, RF_API_KEY)
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('startWorker timed out after 30s')), 30000)
+        )
+
+        const workerId = await Promise.race([workerPromise, timeoutPromise])
         workerRef.current = workerId
 
         if (!cancelled) {
@@ -153,7 +144,7 @@ export default function App() {
         }
       } catch (err) {
         console.error('Engine init error:', err)
-        if (!cancelled) setModelReady(true) // proceed with fallback
+        if (!cancelled) setModelReady(true) // mark ready so UI unblocks (inference will just return [])
       }
     }
     init()
@@ -161,10 +152,9 @@ export default function App() {
   }, [])
 
   /* ────────────────────────────────────────────
-     3. Run a single inference on a canvas or
-        HTMLVideoElement / HTMLImageElement
-     CVImage only supports: ImageBitmap, HTMLImageElement, tf.Tensor
-     So for <video> or <canvas> we must first create an ImageBitmap.
+     3. Run a single inference on a source element.
+     Converts video/image to a canvas before passing
+     to engine.infer() for maximum compatibility.
      ──────────────────────────────────────────── */
   const runInference = useCallback(async (source) => {
     const engine   = engineRef.current
@@ -176,27 +166,26 @@ export default function App() {
     }
 
     try {
-      // CVImage accepts ImageBitmap | HTMLImageElement | tf.Tensor
-      // For <video> or <canvas> elements, convert to ImageBitmap first
-      let inferInput
-
-      if (source instanceof HTMLVideoElement) {
-        // Grab current video frame as ImageBitmap
-        if (source.readyState < 2) return [] // not enough data
-        const bitmap = await createImageBitmap(source)
-        inferInput = bitmap
-      } else if (source instanceof HTMLCanvasElement) {
-        const bitmap = await createImageBitmap(source)
-        inferInput = bitmap
+      // Convert source to a canvas for engine.infer (most reliable input type)
+      let canvas
+      if (source instanceof HTMLCanvasElement) {
+        canvas = source
+      } else if (source instanceof HTMLVideoElement) {
+        if (source.readyState < 2) return []
+        canvas = document.createElement('canvas')
+        canvas.width = source.videoWidth || 640
+        canvas.height = source.videoHeight || 480
+        canvas.getContext('2d').drawImage(source, 0, 0, canvas.width, canvas.height)
       } else if (source instanceof HTMLImageElement) {
-        // HTMLImageElement is directly supported by CVImage
-        inferInput = source
+        canvas = document.createElement('canvas')
+        canvas.width = source.naturalWidth || source.width
+        canvas.height = source.naturalHeight || source.height
+        canvas.getContext('2d').drawImage(source, 0, 0, canvas.width, canvas.height)
       } else {
-        // Assume ImageBitmap or other supported type
-        inferInput = source
+        canvas = source
       }
 
-      const result = await engine.infer(workerId, inferInput)
+      const result = await engine.infer(workerId, canvas)
 
       // result is an array of predictions for object-detection models
       const preds = Array.isArray(result) ? result : (result?.predictions || result?.pred || [])
@@ -214,9 +203,10 @@ export default function App() {
      ──────────────────────────────────────────── */
   const drawBoxes = useCallback((overlay, preds, sourceW, sourceH) => {
     if (!overlay) return
+    // Only reset canvas resolution if it changed (avoids unnecessary flicker)
+    if (overlay.width !== sourceW) overlay.width = sourceW
+    if (overlay.height !== sourceH) overlay.height = sourceH
     const ctx = overlay.getContext('2d')
-    overlay.width = sourceW
-    overlay.height = sourceH
     ctx.clearRect(0, 0, overlay.width, overlay.height)
 
     preds.forEach(p => {
@@ -320,11 +310,15 @@ export default function App() {
   const handleImageUpload = useCallback((e) => {
     const file = e.target.files?.[0]
     if (!file) return
+    // Revoke previous blob URL to prevent memory leak
+    setUploadedImage(prev => { if (prev) URL.revokeObjectURL(prev); return null })
     const url = URL.createObjectURL(file)
     setUploadedImage(url)
     setImagePreds([])
     setDetection(null)
     detectBuffer.current = []
+    // Reset file input so the same file can be re-selected
+    e.target.value = ''
   }, [])
 
   /* ────────────────────────────────────────────
@@ -400,10 +394,16 @@ export default function App() {
     setDetection(null)
     detectBuffer.current = []
     setImagePreds([])
+    setUploadedImage(null)
+    lastSpokenRef.current = null
     // Clear overlays
     if (overlayRef.current) {
       const ctx = overlayRef.current.getContext('2d')
       ctx.clearRect(0, 0, overlayRef.current.width, overlayRef.current.height)
+    }
+    if (imageOverlayRef.current) {
+      const ctx = imageOverlayRef.current.getContext('2d')
+      ctx.clearRect(0, 0, imageOverlayRef.current.width, imageOverlayRef.current.height)
     }
   }, [])
 
@@ -515,18 +515,9 @@ export default function App() {
 
           <input type="range" className="volume-slider" />
 
-          <div className="camera-preview" style={{ position: 'relative' }}>
+          <div className="camera-preview">
             <video ref={videoRef} autoPlay playsInline></video>
-            <canvas
-              ref={overlayRef}
-              className="overlay"
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                pointerEvents: 'none',
-              }}
-            ></canvas>
+            <canvas ref={overlayRef} className="overlay"></canvas>
           </div>
         </div>
       )}
@@ -547,23 +538,28 @@ export default function App() {
           />
 
           {uploadedImage && (
-            <div className="camera-preview" style={{ position: 'relative' }}>
-              <img
-                src={uploadedImage}
-                alt="Uploaded bill"
-                style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-              />
-              <canvas
-                ref={imageOverlayRef}
-                className="overlay"
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  pointerEvents: 'none',
+            <>
+              <div className="camera-preview">
+                <img src={uploadedImage} alt="Uploaded bill" />
+                <canvas ref={imageOverlayRef} className="overlay"></canvas>
+              </div>
+              <button
+                className="change-image-btn"
+                onClick={() => {
+                  setUploadedImage(null)
+                  setImagePreds([])
+                  setDetection(null)
+                  if (imageOverlayRef.current) {
+                    const ctx = imageOverlayRef.current.getContext('2d')
+                    ctx.clearRect(0, 0, imageOverlayRef.current.width, imageOverlayRef.current.height)
+                  }
+                  // Re-trigger file picker
+                  fileInputRef.current?.click()
                 }}
-              ></canvas>
-            </div>
+              >
+                Change Image
+              </button>
+            </>
           )}
         </div>
       )}
@@ -606,15 +602,6 @@ export default function App() {
         </p>
       </div>
 
-      {/* Hidden video for image-mode (camera stays alive for switching back) */}
-      {mode === 'image' && (
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          style={{ display: 'none' }}
-        ></video>
-      )}
     </div>
   )
 }
