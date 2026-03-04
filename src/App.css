@@ -182,6 +182,7 @@ body {
   margin: 0 auto var(--spacing-lg);
 }
 
+
 .capture-btn,
 .audio-btn {
   flex: 1;
@@ -197,6 +198,32 @@ body {
   transition: background-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.6);
 }
+
+
+.capture-btn img,
+.audio-btn img {
+  filter: invert(0); /* default: black */
+  transition: filter 0.3s;
+}
+
+
+
+
+
+.app-container.light-mode .capture-btn img,
+.app-container.light-mode .audio-btn img {
+  filter: invert(0); /* white icons in light mode */
+}
+
+
+
+.app-container.dark-mode .capture-btn img,
+.app-container.dark-mode .audio-btn img
+ {
+  filter: invert(1); /* black icons in dark mode */
+}
+
+
 
 .capture-btn:hover,
 .audio-btn:hover,
