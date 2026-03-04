@@ -1,10 +1,11 @@
 import './App.css'
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { InferenceEngine } from 'inferencejs'
 
 /* ──────────────────────────────────────────────
    Roboflow inferencejs — client-side only
-   Imported as an npm module (inferencejs).
+   Loaded via dynamic import() from the npm module
+   so the app always renders even if inferencejs
+   has bundling issues with Vite/TF.js workers.
    ────────────────────────────────────────────── */
 
 const RF_API_KEY   = 'rf_J8z0Ag3yFvdfvLiDpmtOPMVcNQs2'
@@ -116,21 +117,37 @@ export default function App() {
 
   /* ────────────────────────────────────────────
      2. inferencejs engine init (npm module)
-     Imports InferenceEngine directly from 'inferencejs'.
+     Uses dynamic import() so the app always renders
+     even if inferencejs fails to load/bundle.
+     RF-DETR models are large — first load can take
+     60-120s while weights are downloaded & parsed.
      ──────────────────────────────────────────── */
+  const [modelStatus, setModelStatus] = useState('Loading inferencejs…')
+
   useEffect(() => {
     let cancelled = false
     const init = async () => {
       try {
+        // Dynamic import — if this fails the app still works
+        console.info('[inferencejs] Loading module…')
+        if (!cancelled) setModelStatus('Importing inferencejs module…')
+        const mod = await import('inferencejs')
+        const InferenceEngine = mod.InferenceEngine || mod.default?.InferenceEngine || mod.default
+
+        if (!InferenceEngine) {
+          throw new Error('Could not resolve InferenceEngine from inferencejs module')
+        }
+
         const engine = new InferenceEngine()
         engineRef.current = engine
 
-        console.info('[inferencejs] Starting worker…')
+        console.info('[inferencejs] Starting worker — downloading RF-DETR model (this may take 30-120s on first load)…')
+        if (!cancelled) setModelStatus('Downloading & initializing RF-DETR model… (first load may take 1-2 min)')
 
-        // startWorker can hang if the model isn't accessible — add a 30s timeout
+        // RF-DETR is a large model — give it up to 120s to load
         const workerPromise = engine.startWorker(RF_MODEL, RF_VERSION, RF_API_KEY)
         const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('startWorker timed out after 30s')), 30000)
+          setTimeout(() => reject(new Error('startWorker timed out after 120s')), 120000)
         )
 
         const workerId = await Promise.race([workerPromise, timeoutPromise])
@@ -138,11 +155,16 @@ export default function App() {
 
         if (!cancelled) {
           setModelReady(true)
+          setModelStatus('Model ready ✓')
           console.info(`[inferencejs] worker ${workerId} started for ${RF_MODEL}/${RF_VERSION}`)
         }
       } catch (err) {
-        console.error('Engine init error:', err)
-        if (!cancelled) setModelReady(true) // mark ready so UI unblocks (inference will just return [])
+        console.error('[inferencejs] init error:', err)
+        if (!cancelled) {
+          setModelStatus(`Model failed to load: ${err.message}`)
+          // Still mark ready so the UI unblocks
+          setModelReady(true)
+        }
       }
     }
     init()
@@ -151,39 +173,42 @@ export default function App() {
 
   /* ────────────────────────────────────────────
      3. Run a single inference on a source element.
-     Converts video/image to a canvas before passing
-     to engine.infer() for maximum compatibility.
+     engine.infer() transfers data to a Web Worker
+     via postMessage — it MUST receive an ImageBitmap
+     (the only image type that is Transferable).
+     Canvas, Video, Image elements are NOT transferable.
      ──────────────────────────────────────────── */
   const runInference = useCallback(async (source) => {
     const engine   = engineRef.current
     const workerId = workerRef.current
 
     if (!engine || workerId == null || typeof engine.infer !== 'function') {
-      console.warn('[runInference] inferencejs engine not ready yet — skipping frame')
+      // Engine not ready yet — silently skip
       return []
     }
 
     try {
-      // Convert source to a canvas for engine.infer (most reliable input type)
-      let canvas
-      if (source instanceof HTMLCanvasElement) {
-        canvas = source
+      // Step 1: Create an ImageBitmap from any source type.
+      // ImageBitmap is the ONLY type that can be transferred to the Web Worker.
+      let bitmap
+      if (source instanceof ImageBitmap) {
+        bitmap = source
       } else if (source instanceof HTMLVideoElement) {
         if (source.readyState < 2) return []
-        canvas = document.createElement('canvas')
-        canvas.width = source.videoWidth || 640
-        canvas.height = source.videoHeight || 480
-        canvas.getContext('2d').drawImage(source, 0, 0, canvas.width, canvas.height)
+        bitmap = await createImageBitmap(source)
+      } else if (source instanceof HTMLCanvasElement) {
+        bitmap = await createImageBitmap(source)
       } else if (source instanceof HTMLImageElement) {
-        canvas = document.createElement('canvas')
-        canvas.width = source.naturalWidth || source.width
-        canvas.height = source.naturalHeight || source.height
-        canvas.getContext('2d').drawImage(source, 0, 0, canvas.width, canvas.height)
+        if (!source.complete || !source.naturalWidth) return []
+        bitmap = await createImageBitmap(source)
       } else {
-        canvas = source
+        // Last resort: try createImageBitmap on whatever it is
+        bitmap = await createImageBitmap(source)
       }
 
-      const result = await engine.infer(workerId, canvas)
+      // Step 2: Pass the ImageBitmap to engine.infer()
+      // infer() will transfer it to the worker via postMessage(data, [bitmap])
+      const result = await engine.infer(workerId, bitmap)
 
       // result is an array of predictions for object-detection models
       const preds = Array.isArray(result) ? result : (result?.predictions || result?.pred || [])
@@ -243,7 +268,7 @@ export default function App() {
      when 3 consecutive frames agree on the same top class.
      ──────────────────────────────────────────── */
   useEffect(() => {
-    if (mode !== 'realtime' || !modelReady) return
+    if (mode !== 'realtime') return
     let rafId = null
     let running = true
     loopActiveRef.current = true
@@ -300,7 +325,7 @@ export default function App() {
       loopActiveRef.current = false
       if (rafId) clearTimeout(rafId)
     }
-  }, [mode, modelReady, runInference, drawBoxes, speak])
+  }, [mode, runInference, drawBoxes, speak])
 
   /* ────────────────────────────────────────────
      6. Image upload handler
@@ -495,10 +520,10 @@ export default function App() {
         </button>
       </div>
 
-      {/* Model loading indicator */}
+      {/* Model loading indicator (non-blocking) */}
       {!modelReady && (
-        <p className="guide-text" style={{ textAlign: 'center' }}>
-          ⏳ Loading detection model…
+        <p className="guide-text" style={{ textAlign: 'center', fontSize: '0.85rem', opacity: 0.8 }}>
+          ⏳ {modelStatus}
         </p>
       )}
 
