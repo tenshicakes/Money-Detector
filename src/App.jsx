@@ -12,7 +12,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 
 const RF_API_KEY   = 'rf_J8z0Ag3yFvdfvLiDpmtOPMVcNQs2'
 const RF_MODEL     = 'bill-detection-emid4'
-const RF_VERSION   = 3
+const RF_VERSION   = 6
 const VALID_CLASSES = ['20', '50', '100', '200', '500', '1000']
 const CONFIDENCE_THRESHOLD = 0.50
 const TRIPLE_CHECK_COUNT = 3
